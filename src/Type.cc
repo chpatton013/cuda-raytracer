@@ -1,7 +1,32 @@
 #include "Type.h"
 
+#include <assert.h>
 #include <math.h>
+#include <stdio.h>
 #include <stdlib.h>
+
+Type::Camera Type::Camera::MakeCamera(
+   float* p, float* f, float* u, float zn, float zf, float h
+) {
+   Camera camera;
+
+   copy(p, camera.position);
+   copy(f, camera.forward);
+   copy(u, camera.up);
+   camera.z_near = zn;
+   camera.z_far = zf;
+   camera.hfov = h * M_PI / 180.0; // given in degrees, needed in radians
+
+   return camera;
+}
+void Type::Camera::print() {
+   Util::print(position, true);
+   Util::print(forward, true);
+   Util::print(up, true);
+   Util::print(z_near, true);
+   Util::print(z_far, true);
+   Util::print(hfov, true);
+}
 
 Type::Light Type::Light::MakeLight(float* p, float* c) {
    Light light;
@@ -10,6 +35,10 @@ Type::Light Type::Light::MakeLight(float* p, float* c) {
    copy(c, light.color);
 
    return light;
+}
+void Type::Light::print() {
+   Util::print(position, true);
+   Util::print(color, true);
 }
 
 Type::Composition Type::Composition::MakeComposition (
@@ -24,6 +53,13 @@ Type::Composition Type::Composition::MakeComposition (
 
    return comp;
 }
+void Type::Composition::print() {
+   Util::print(ambient, true);
+   Util::print(diffuse, true);
+   Util::print(specular, true);
+   Util::print(spec_pow, true);
+}
+
 void Type::Composition::AmbientLighting(float* color) {
    copy(ambient, color);
 }
@@ -72,6 +108,12 @@ Type::Sphere Type::Sphere::MakeSphere(float* e, float r, Composition& c) {
 
    return sphere;
 }
+void Type::Sphere::print() {
+   Util::print(center, true);
+   Util::print(radius, true);
+   comp.print();
+}
+
 float Type::Sphere::Intersect(Type::Ray* ray) {
    float* c = center;
    float* d = ray->direction;
@@ -130,4 +172,58 @@ float* Type::Image::Pixel(uint16_t x, uint16_t y) {
    } else {
       return NULL;
    }
+}
+void Type::Image::WriteTGA(const char* path) {
+   FILE *fp = fopen(path, "w");
+   assert(fp);
+
+   // write 24-bit uncompressed targa header
+   // thanks to Paul Bourke (http://local.wasp.uwa.edu.au/~pbourke/dataformats/tga/)
+   putc(0, fp);
+   putc(0, fp);
+
+   putc(2, fp); // type is uncompressed RGB
+
+   putc(0, fp);
+   putc(0, fp);
+   putc(0, fp);
+   putc(0, fp);
+   putc(0, fp);
+
+   putc(0, fp); // x origin, low byte
+   putc(0, fp); // x origin, high byte
+
+   putc(0, fp); // y origin, low byte
+   putc(0, fp); // y origin, high byte
+
+   putc(width & 0xff, fp); // width, low byte
+   putc((width & 0xff00) >> 8, fp); // width, high byte
+
+   putc(height & 0xff, fp); // height, low byte
+   putc((height & 0xff00) >> 8, fp); // height, high byte
+
+   putc(24, fp); // 24-bit color depth
+
+   putc(0, fp);
+
+   // write the raw pixel data in groups of 3 bytes (BGR order)
+   for (int y = 0; y < height; ++y) {
+      for (int x = 0; x < width; ++x) {
+         unsigned char rbyte, gbyte, bbyte;
+
+         double r = fmin(1.0f, Pixel(x, y)[0]);
+         double g = fmin(1.0f, Pixel(x, y)[1]);
+         double b = fmin(1.0f, Pixel(x, y)[2]);
+
+         rbyte = (unsigned char)(r * 255);
+         gbyte = (unsigned char)(g * 255);
+         bbyte = (unsigned char)(b * 255);
+
+         putc(bbyte, fp);
+         putc(gbyte, fp);
+         putc(rbyte, fp);
+      }
+   }
+
+   fclose(fp);
 }

@@ -1,7 +1,7 @@
 SRC_DIR = src
 OBJ_DIR = obj
 LIBS = m
-INCS = $(SRC_DIR)
+INCS = $(SRC_DIR) third_party/tclap/include
 SRCS = $(shell find $(SRC_DIR) -name "*.cc")
 DEPS = $(shell find $(SRC_DIR) -name "*.h")
 OBJS = $(patsubst $(SRC_DIR)/%.o,$(OBJ_DIR)/%.o,$(SRCS:.cc=.o))
@@ -35,6 +35,7 @@ prepare:
 
 clean:
 	rm -f $(OBJS)
+	rm -rf $(OBJ_SUB_DIRS)
 
 remove: clean
 	rm -f $(EXEC)

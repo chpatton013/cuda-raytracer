@@ -1,7 +1,9 @@
 #include "Util.h"
 
+#include <assert.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 void Util::copy(float* v_src, float* v_dest) {
    for (int ndx = 0; ndx < 3; ++ndx) {
@@ -89,4 +91,24 @@ void Util::print(float* v, bool nl = false) {
    if (nl) {
       printf("\n");
    }
+}
+
+float Util::get_next_float(std::ifstream& filestream) {
+   float next_float;
+
+   if (filestream.good()) {
+      filestream >> next_float;
+      return next_float;
+   } else {
+      return NAN;
+   }
+}
+bool Util::get_next_vector(std::ifstream& filestream, float* buffer) {
+   for (int ndx = 0; ndx < 3; ++ndx) {
+      if (isnan(buffer[ndx] = get_next_float(filestream))) {
+         return false;
+      }
+   }
+
+   return true;
 }

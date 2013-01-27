@@ -1,58 +1,237 @@
 #include "API.h"
 
-#include <assert.h>
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
 
-void API::Prepare() {
-   copy(DFLT_CAMERA_POSITION, camera.position);
-   copy(DFLT_CAMERA_FORWARD, camera.forward);
-   copy(DFLT_CAMERA_UP, camera.up);
-   camera.z_near = DFLT_CAMERA_Z_NEAR;
-   camera.z_far = DFLT_CAMERA_Z_FAR;
+#include <iostream>
+#include <fstream>
+#include <string>
 
+#include <tclap/CmdLine.h>
+
+void API::Prepare() {
    light_count = 0;
    sphere_count = 0;
+
+   AddCamera(camera_filename);
+   AddLights(light_filename);
+   AddSpheres(geometry_filename);
+}
+bool API::ParseArgs(int argc, char** argv) {
+   int32_t width_val;
+   int32_t height_val;
+   std::string camera_val;
+   std::string light_val;
+   std::string geometry_val;
+   std::string output_val;
+   bool cuda_val;
+
+   try {
+      TCLAP::CmdLine cmd("Awesome Ray Tracer", ' ', "", false);
+
+      TCLAP::ValueArg<int32_t> width_arg(
+         "w", "width", "Output image width",
+         false, DFLT_IMAGE_WIDTH, "positive integer"
+      );
+      TCLAP::ValueArg<int32_t> height_arg(
+         "h", "height", "Output image height",
+         false, DFLT_IMAGE_HEIGHT, "positive integer"
+      );
+      TCLAP::ValueArg<std::string> camera_arg(
+         "c", "camera", "Filename to use to generate the camera",
+         false, DFLT_CAMERA_FILENAME, "string"
+      );
+      TCLAP::ValueArg<std::string> light_arg(
+         "l", "light", "Filename to use to generate lights",
+         false, DFLT_LIGHT_FILENAME, "string"
+      );
+      TCLAP::ValueArg<std::string> geometry_arg(
+         "g", "geometry", "Filename to use to generate geometry",
+         false, DFLT_GEOMETRY_FILENAME, "string"
+      );
+      TCLAP::ValueArg<std::string> output_arg(
+         "o", "output", "Filename of output image",
+         false, DFLT_OUTPUT_FILENAME, "string"
+      );
+      TCLAP::SwitchArg cuda_switch(
+         "p", "parallel", "Use CUDA for massive parallelization",
+         DFLT_CUDA_MODE
+      );
+
+      cmd.add(width_arg);
+      cmd.add(height_arg);
+      cmd.add(camera_arg);
+      cmd.add(light_arg);
+      cmd.add(geometry_arg);
+      cmd.add(output_arg);
+      cmd.add(cuda_switch);
+
+      cmd.parse(argc, argv);
+
+      width_val = width_arg.getValue();
+      height_val = height_arg.getValue();
+      camera_val = camera_arg.getValue();
+      light_val = light_arg.getValue();
+      geometry_val = geometry_arg.getValue();
+      output_val = output_arg.getValue();
+      cuda_val = cuda_switch.getValue();
+   } catch (TCLAP::ArgException &e) {
+      fprintf(stderr,
+         "error: %s for arg %s\n", e.error().c_str(), e.argId().c_str()
+      );
+      return false;
+   }
+
+   // check bounds on image width
+   if (width_val > MAX_IMAGE_WIDTH) {
+      fprintf(stderr,
+         "error: image width must be less than %d\n", MAX_IMAGE_WIDTH
+      );
+      return false;
+   } else if (width_val <= 0) {
+      fprintf(stderr, "error: image width must be positive\n");
+      return false;
+   } else {
+      image_width = width_val;
+   }
+
+   // check bounds on image height
+   if (height_val > MAX_IMAGE_HEIGHT) {
+      fprintf(stderr,
+         "error: image height must be less than %d\n", MAX_IMAGE_HEIGHT
+      );
+      return false;
+   } else if (height_val <= 0) {
+      fprintf(stderr, "error: image height must be positive\n");
+      return false;
+   } else {
+      image_height = height_val;
+   }
+
+   // assume files exist and are readable
+   camera_filename = camera_val;
+   light_filename = light_val;
+   geometry_filename = geometry_val;
+   output_filename = output_val;
+
+   cuda_mode = cuda_val;
+
+   return true;
 }
 
-uint16_t API::AddLight(Light& light) {
+bool API::AddCamera(const std::string& filename) {
+   float p[3];
+   float f[3];
+   float u[3];
+   float zn;
+   float zf;
+   float h;
+
+   std::ifstream filestream(filename.c_str());
+   bool success =
+      get_next_vector(filestream, p) &&
+      get_next_vector(filestream, f) &&
+      get_next_vector(filestream, u) &&
+      !isnan(zn = get_next_float(filestream)) &&
+      !isnan(zf = get_next_float(filestream)) &&
+      !isnan(h = get_next_float(filestream));
+
+   if (success) {
+      camera = Camera::MakeCamera(p, f, u, zn, zf, h);
+   }
+
+   return success;
+}
+
+bool API::AddLights(const std::string& filename) {
+   std::ifstream filestream(filename.c_str());
+   bool success;
+   Light light;
+
+   do {
+      float p[3];
+      float c[3];
+
+      success = get_next_vector(filestream, p) &&
+                get_next_vector(filestream, c);
+
+      if (success) {
+         light = Light::MakeLight(p, c);
+      }
+   } while (success && AddLight(light));
+
+   return success;
+}
+bool API::AddLight(Light& light) {
    if (light_count < MAX_LIGHTS) {
-      light_arr[light_count] = light;
-      return ++light_count;
+      light_arr[light_count++] = light;
+      return true;
    } else {
-      return 0;
+      return false;
    }
 }
-uint16_t API::AddSphere(Sphere& sphere) {
+
+bool API::AddSpheres(const std::string& filename) {
+   std::ifstream filestream(filename.c_str());
+   bool success;
+   Sphere sphere;
+
+   do {
+      float e[3];
+      float r;
+      float a[3];
+      float d[3];
+      float sc[3];
+      float sp;
+      Composition c;
+
+      success =
+         get_next_vector(filestream, e) &&
+         !isnan(r = get_next_float(filestream)) &&
+         get_next_vector(filestream, a) &&
+         get_next_vector(filestream, d) &&
+         get_next_vector(filestream, sc) &&
+         !isnan(sp = get_next_float(filestream));
+
+      if (success) {
+         c = Composition::MakeComposition(a, d, sc, sp);
+         sphere = Sphere::MakeSphere(e, r, c);
+      }
+   } while (success && AddSphere(sphere));
+
+   return success;
+}
+bool API::AddSphere(Sphere& sphere) {
    if (sphere_count < MAX_SPHERES) {
-      sphere_arr[sphere_count] = sphere;
-      return ++sphere_count;
+      sphere_arr[sphere_count++] = sphere;
+      return true;
    } else {
       return 0;
    }
 }
 
-void API::Draw(uint16_t width, uint16_t height, float hfov) {
-   image = Image::MakeImage(width, height);
+void API::Draw() {
+   image = Image::MakeImage(image_width, image_height);
 
-   float vfov = hfov * height / (float)width;
+   float vfov = camera.hfov * image_height / (float)image_width;
 
    uint64_t rays_cast = 0;
-   for (uint16_t x = 0; x < width; ++x) {
-      for (uint16_t y = 0; y < height; ++y) {
+   for (uint16_t x = 0; x < image_width; ++x) {
+      for (uint16_t y = 0; y < image_height; ++y) {
          float scaled_camera_right[3];
          cross(camera.forward, camera.up, scaled_camera_right);
          scalei(
             scaled_camera_right,
-            tan(hfov * 0.5f) * (((x + 0.5f) * 2.0f / (float)width) - 1.0f)
+            tan(camera.hfov * 0.5f) *
+             (((x + 0.5f) * 2.0f / (float)image_width) - 1.0f)
          );
 
          float scaled_camera_up[3];
          scale(
             camera.up,
             tan(vfov * 0.5f) *
-               (1.0f - ((height - y + 0.5f) / (float)height) * 2.0f),
+             (1.0f - ((image_height - y + 0.5f) / (float)image_height) * 2.0f),
             scaled_camera_up
          );
 
@@ -78,14 +257,14 @@ void API::Draw(uint16_t width, uint16_t height, float hfov) {
          image.Pixel(x, y, color);
       }
 
-      if (x % (width / 25) == 0) {
-         printf("%d%% complete...\n", x * 100 / width);
+      if (x % (image_width / 25) == 0) {
+         float complete = ((x + 25) / (float)image_width);
+         printf("%d%% complete...\n", (int)(complete * 100.0f));
       }
    }
 
    printf("DONE: %llu rays cast\n", (long long unsigned int)rays_cast);
 }
-
 float API::GetClosestIntersection(Ray* ray, Sphere** sphere) {
    float closest_param = FLT_MAX;
    Sphere* closest_sphere = NULL;
@@ -106,7 +285,6 @@ float API::GetClosestIntersection(Ray* ray, Sphere** sphere) {
       return closest_param;
    }
 }
-
 void API::LightSurface(
    Ray* ray, float parameter, Sphere* sphere, float* color
 ) {
@@ -151,57 +329,6 @@ void API::LightSurface(
    }
 }
 
-void API::WriteTGA(const char* path) {
-   FILE *fp = fopen(path, "w");
-   assert(fp);
-
-   // write 24-bit uncompressed targa header
-   // thanks to Paul Bourke (http://local.wasp.uwa.edu.au/~pbourke/dataformats/tga/)
-   putc(0, fp);
-   putc(0, fp);
-
-   putc(2, fp); // type is uncompressed RGB
-
-   putc(0, fp);
-   putc(0, fp);
-   putc(0, fp);
-   putc(0, fp);
-   putc(0, fp);
-
-   putc(0, fp); // x origin, low byte
-   putc(0, fp); // x origin, high byte
-
-   putc(0, fp); // y origin, low byte
-   putc(0, fp); // y origin, high byte
-
-   putc(image.width & 0xff, fp); // width, low byte
-   putc((image.width & 0xff00) >> 8, fp); // width, high byte
-
-   putc(image.height & 0xff, fp); // height, low byte
-   putc((image.height & 0xff00) >> 8, fp); // height, high byte
-
-   putc(24, fp); // 24-bit color depth
-
-   putc(0, fp);
-
-   // write the raw pixel data in groups of 3 bytes (BGR order)
-   for (int y = 0; y < image.height; ++y) {
-      for (int x = 0; x < image.width; ++x) {
-         unsigned char rbyte, gbyte, bbyte;
-
-         double r = fmin(1.0f, image.Pixel(x, y)[0]);
-         double g = fmin(1.0f, image.Pixel(x, y)[1]);
-         double b = fmin(1.0f, image.Pixel(x, y)[2]);
-
-         rbyte = (unsigned char)(r * 255);
-         gbyte = (unsigned char)(g * 255);
-         bbyte = (unsigned char)(b * 255);
-
-         putc(bbyte, fp);
-         putc(gbyte, fp);
-         putc(rbyte, fp);
-      }
-   }
-
-   fclose(fp);
+void API::WriteTGA() {
+   image.WriteTGA(output_filename.c_str());
 }

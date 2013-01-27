@@ -1,7 +1,15 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
+#include <stdio.h>
+
+#include <iostream>
+#include <fstream>
+
 namespace Util {
+   static float zero_vector[3] = {0.0f, 0.0f, 0.0f};
+
+   // Vector functions
    void copy(float* v_src, float* v_dest);
    float dot(float* v1, float* v2);
    void cross(float* v1, float* v2, float* v_dest);
@@ -18,6 +26,10 @@ namespace Util {
    void scalei(float* v1, float* v2);
    void print(float f, bool nl);
    void print(float* v, bool nl);
+
+   // IO functions
+   float get_next_float(std::ifstream& filestream);
+   bool get_next_vector(std::ifstream& filestream, float* buffer);
 }
 
 #endif
