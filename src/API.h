@@ -19,8 +19,8 @@ namespace API {
    static const uint16_t MAX_SPHERES = 32768;
 
    // Defaults
-   static const uint16_t DFLT_IMAGE_WIDTH = 1024;
-   static const uint16_t DFLT_IMAGE_HEIGHT = 768;
+   static const uint16_t DFLT_IMAGE_WIDTH = 1280;
+   static const uint16_t DFLT_IMAGE_HEIGHT = 720;
    static const std::string DFLT_CAMERA_FILENAME = "camera.txt";
    static const std::string DFLT_LIGHT_FILENAME = "lights.txt";
    static const std::string DFLT_GEOMETRY_FILENAME = "geometry.txt";
