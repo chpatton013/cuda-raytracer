@@ -5,6 +5,7 @@ INCS = $(SRC_DIR) third_party/tclap/include
 SRCS = $(shell find $(SRC_DIR) -name "*.cc")
 SRCS_CUDA = $(shell find $(SRC_DIR) -name "*.cu")
 DEPS = $(shell find $(SRC_DIR) -name "*.h")
+DEPS_CUDA = $(shell find $(SRC_DIR) -name "*.cuh")
 OBJS = $(patsubst $(SRC_DIR)/%.o,$(OBJ_DIR)/%.o,$(SRCS:.cc=.o))
 OBJS_CUDA = $(patsubst $(SRC_DIR)/%.o,$(OBJ_DIR)/%.o,$(SRCS_CUDA:.cu=.o))
 SRC_SUB_DIRS = $(shell find $(SRC_DIR) -type d)

@@ -1,4 +1,5 @@
 #include "API.h"
+#include "cuda.h"
 
 #include <float.h>
 #include <math.h>
@@ -215,6 +216,8 @@ void API::Draw() {
    image = Image::MakeImage(image_width, image_height);
 
    float vfov = camera.hfov * image_height / (float)image_width;
+   
+   cudaWrapper(image_width, image_height);
 
    uint64_t rays_cast = 0;
    for (uint16_t x = 0; x < image_width; ++x) {
@@ -235,9 +238,6 @@ void API::Draw() {
             scaled_camera_up
          );
 
-         // ray_direction = normalized(
-         //    camera forward + scaled_camera_right + scaled_camera_up
-         // )
          float ray_direction[3];
          add(zero_vector, camera.forward, ray_direction);
          addi(ray_direction, scaled_camera_right);

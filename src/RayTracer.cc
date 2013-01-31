@@ -5,8 +5,6 @@
 #include "Util.h"
 
 
-void cudaWrapper();
-
 int main(int argc, char** argv) {
 
    API::ParseArgs(argc, argv);
@@ -16,8 +14,6 @@ int main(int argc, char** argv) {
    API::Draw();
 
    API::WriteTGA();
-   
-   cudaWrapper();
 
    return EXIT_SUCCESS;
 }
