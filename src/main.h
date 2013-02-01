@@ -18,8 +18,7 @@ static const std::string dflt_camera_filename ="camera.txt";
 static const std::string dflt_light_filename ="lights.txt";
 static const std::string dflt_geometry_filename ="geometry.txt";
 static const std::string dflt_output_filename ="output.tga";
-// TODO: change this to false when CUDA is implemented
-static const bool dflt_cpu_mode = true;
+static const bool dflt_cpu_mode = false;
 
 // Globals
 static uint16_t img_w;
