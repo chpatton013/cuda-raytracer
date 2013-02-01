@@ -26,9 +26,9 @@ void draw_scene_gpu(
    uint16_t img_w, uint16_t img_h
 );
 __global__ void draw_scene_kernel(
-   Sphere* d_spheres, uint16_t sphere_count,
-   Light* d_lights, uint16_t light_count,
-   Camera* d_camera, float* d_image_buffer,
+   sphere_t* d_spheres, uint16_t sphere_count,
+   light_t* d_lights, uint16_t light_count,
+   camera_t* d_camera, float* d_img_buffer,
    uint16_t img_w, uint16_t img_h
 );
 

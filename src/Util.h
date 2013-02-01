@@ -1,7 +1,8 @@
 #ifndef _UTIL_H_
 #define _UTIL_H_
 
-#define CUDA_CALLABLE __host__ __device___
+#include <cuda.h>
+#define CUDA_CALLABLE __host__ __device__
 
 CUDA_CALLABLE float Q_rsqrt(float number);
 

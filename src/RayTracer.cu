@@ -80,7 +80,7 @@ void draw_scene_gpu(
       cudaMemcpyHostToDevice
    );
    cudaMemcpy(
-      d_img_buffer, img.buffer, sizeof(float) * img_w * img_h * 3,
+      d_img_buffer, img_buffer, sizeof(float) * img_w * img_h * 3,
       cudaMemcpyHostToDevice
    );
 
@@ -106,10 +106,10 @@ void draw_scene_gpu(
    cudaFree(d_img_buffer);
 }
 
-void draw_scene_kernel(
-   Sphere* d_spheres, uint16_t sphere_count,
-   Light* d_lights, uint16_t light_count,
-   Camera* d_camera, float* d_image_buffer,
+__global__ void draw_scene_kernel(
+   sphere_t* d_spheres, uint16_t sphere_count,
+   light_t* d_lights, uint16_t light_count,
+   camera_t* d_camera, float* d_img_buffer,
    uint16_t img_w, uint16_t img_h
 ) {
    int x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -123,7 +123,7 @@ void draw_scene_kernel(
    }
 }
 
-void cast_primary_ray(
+CUDA_CALLABLE void cast_primary_ray(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
    camera_t* camera, float* img_buffer,
@@ -149,7 +149,7 @@ void cast_primary_ray(
    copy(color, img_buffer + 3 * (y * img_w + x));
 }
 
-void get_primary_ray_direction(
+CUDA_CALLABLE void get_primary_ray_direction(
    camera_t* camera,
    uint16_t img_w, uint16_t img_h,
    uint16_t x, uint16_t y,
@@ -179,7 +179,7 @@ void get_primary_ray_direction(
    norm_i(direction);
 }
 
-float get_closest_intersection(
+CUDA_CALLABLE float get_closest_intersection(
    ray_t* ray, sphere_t* spheres, uint16_t sphere_count, sphere_t** target
 ) {
    float closest_param = FLT_MAX;
@@ -202,7 +202,7 @@ float get_closest_intersection(
    }
 }
 
-void light_surface(
+CUDA_CALLABLE void light_surface(
    ray_t* ray, float parameter, sphere_t* sphere,
    camera_t* camera, light_t* lights, uint16_t light_count,
    float* color
