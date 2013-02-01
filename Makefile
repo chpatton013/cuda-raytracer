@@ -23,8 +23,8 @@ LDFLAGS =
 all: debug
 run: all
 debug: CFLAGS += -g -DDEBUG
-release: CFLAGS += -O2 -use-fast-math -DNDEBUG
-profile: CFLAGS += -g -pg -O2 -use-fast-math -DNDEBUG
+release: CFLAGS += -O2 -DNDEBUG
+profile: CFLAGS += -g -pg -O2 -DNDEBUG
 profile: LDFLAGS += -pg
 
 debug release profile: $(EXEC)
