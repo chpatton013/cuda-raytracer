@@ -1,86 +1,61 @@
 #ifndef _TYPE_H_
 #define _TYPE_H_
 
-#include <stdint.h>
-#include <stdio.h>
-
-#include <string>
-
 #include "Util.h"
 
-namespace Type {
-   using namespace Util;
+struct light_t {
+   float position[3];
+   float color[3];
+};
 
-   struct Camera {
-      static Camera MakeCamera(
-         float* p, float* f, float* u, float zn, float zf, float h
-      );
-      void print();
+struct composition_t {
+   float ambient[3];
+   float diffuse[3];
+   float specular[3];
+   float shine;
+};
 
-      float position[3];
-      float forward[3];
-      float up[3];
-      float z_near;
-      float z_far;
-      float hfov;
-   };
+struct sphere_t {
+   float center[3];
+   float radius;
+   composition_t composition;
+};
 
-   struct Light {
-      static Light MakeLight(float* p, float* c);
-      void print();
+struct ray_t {
+   float origin[3];
+   float direction[3];
+};
 
-      float position[3];
-      float color[3];
-   };
+struct camera_t {
+   float position[3];
+   float front[3];
+   float up[3];
+   float z[3]; // near, far, focal
+   float fov[2]; // horiz, vert: degrees
+};
 
-   struct Composition {
-      static Composition MakeComposition(
-         float* a, float* d, float* sc, float sp
-      );
-      void print();
-
-      void AmbientLighting(float* color);
-      void DiffuseLighting(float* light_direction, float* normal, float* color);
-      void SpecularLighting(float* reflected, float* viewer, float* color);
-
-      float ambient[3];
-      float diffuse[3];
-      float specular[3];
-      float spec_pow;
-   };
-
-   struct Ray {
-      static Ray MakeRay(float* o, float* d);
-
-      void Position(float parameter, float* position);
-
-      float origin[3];
-      float direction[3];
-   };
-
-   struct Sphere {
-      static Sphere MakeSphere(float* e, float r, Composition& c);
-      void print();
-
-      float Intersect(Ray* ray);
-      void Normal(float* point, float* normal);
-
-      float center[3];
-      float radius;
-      Composition comp;
-   };
-
-   struct Image {
-      static Image MakeImage(uint16_t w, uint16_t h);
-
-      bool Pixel(uint16_t x, uint16_t y, float* color);
-      float* Pixel(uint16_t x, uint16_t y);
-      void WriteTGA(const char* path);
-
-      float* buffer;
-      uint16_t width;
-      uint16_t height;
-   };
-}
+CUDA_CALLABLE void get_ambient_lighting(
+   composition_t* composition, float* color
+);
+CUDA_CALLABLE void get_diffuse_lighting(
+   float* light_direction, float* surface_normal,
+   composition_t* composition, float* color
+);
+CUDA_CALLABLE void get_specular_lighting(
+   float* reflected_direction, float* viewer_direction,
+   composition_t* composition, float* color
+);
+CUDA_CALLABLE void get_phong_lighting(
+   float* light_direction, float* surface_normal,
+   float* reflected_direction, float* viewer_direction,
+   composition_t* composition, float* color
+);
+CUDA_CALLABLE void get_ray_position(
+   ray_t* ray, float parameter, float* position
+);
+CUDA_CALLABLE void get_sphere_normal(
+   sphere_t* sphere, float* position, float* normal
+);
+CUDA_CALLABLE float get_ray_sphere_intersection(ray_t* ray, sphere_t* sphere);
 
 #endif
