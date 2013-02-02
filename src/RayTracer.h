@@ -210,11 +210,6 @@ void draw_scene_cpu(
    printf("DONE: %llu rays cast\n", (long long unsigned int)rays_cast);
 }
 
-
-
-
-
-
 void draw_scene_gpu(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
@@ -225,10 +220,8 @@ void draw_scene_gpu(
    sphere_t* d_spheres;
    light_t* d_lights;
    float* d_img_buffer;
-    cudaEvent_t start, stop;
-    float   elapsedTime;
-
-
+   cudaEvent_t start, stop;
+   float elapsedTime;
 
    cudaMalloc((void**)&d_camera, sizeof(camera_t));
    cudaMalloc((void**)&d_spheres, sizeof(sphere_t) * sphere_count);
@@ -249,8 +242,6 @@ void draw_scene_gpu(
       cudaMemcpyHostToDevice
    );
 
-
-
    int block_width = 16;
    dim3 threads = dim3(block_width, block_width);
    dim3 blocks = dim3(
@@ -258,10 +249,10 @@ void draw_scene_gpu(
       img_h / block_width + ((img_h % block_width) ? 1 : 0)
    );
 
-    /* start timing */
-    HANDLE_ERROR(cudaEventCreate(&start));
-    HANDLE_ERROR(cudaEventCreate(&stop));
-    HANDLE_ERROR(cudaEventRecord(start, 0));
+   /* start timing */
+   HANDLE_ERROR(cudaEventCreate(&start));
+   HANDLE_ERROR(cudaEventCreate(&stop));
+   HANDLE_ERROR(cudaEventRecord(start, 0));
 
    draw_scene_kernel<<<blocks,threads>>>(
       d_spheres, sphere_count, d_lights, light_count,
@@ -273,16 +264,15 @@ void draw_scene_gpu(
       cudaMemcpyDeviceToHost
    );
 
-    /* stop and print timing */
-    HANDLE_ERROR(cudaEventRecord( stop, 0 ));
-    HANDLE_ERROR(cudaEventSynchronize( stop ));
-    HANDLE_ERROR(cudaEventElapsedTime( &elapsedTime, start, stop ));
-    printf("GPU computation complete\n");
-    printf( "Time to generate:  %.1f ms\n", elapsedTime );
-    HANDLE_ERROR(cudaEventDestroy( start ));
-    HANDLE_ERROR(cudaEventDestroy( stop ));
-   
-  
+   /* stop and print timing */
+   HANDLE_ERROR(cudaEventRecord( stop, 0 ));
+   HANDLE_ERROR(cudaEventSynchronize( stop ));
+   HANDLE_ERROR(cudaEventElapsedTime( &elapsedTime, start, stop ));
+   printf("GPU computation complete\n");
+   printf( "Time to generate:  %.1f ms\n", elapsedTime );
+   HANDLE_ERROR(cudaEventDestroy( start ));
+   HANDLE_ERROR(cudaEventDestroy( stop ));
+
    cudaFree(d_camera);
    cudaFree(d_spheres);
    cudaFree(d_lights);

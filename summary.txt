@@ -1,0 +1,17 @@
+Garrett Milster
+Russell Taylor
+Christopher Patton
+
+Profiling 100 spheres
+GPU 13.2ms
+CPU 7.9s
+
+Parallelizing this code was sooooo hard! We had to take our function that
+iterates over pixels and get rid of the for loops! Looking back, we basically
+followed Nick's advice without knowing it.
+We had a bunch of issues with C++ incompatiblity, so we rewrote the code using
+structs with no member functions, and this fixed all of problems. The only
+difference between the CPU and GPU code is an intermediate fucntion that
+initializes the CUDA data and fires off the kernel.
+
+Program output: output.tga
