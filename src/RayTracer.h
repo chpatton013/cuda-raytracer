@@ -6,41 +6,41 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <cuda_runtime.h>
 #include <cuda.h>
+#include <cuda_runtime_api.h>
+#include <cuda_gl_interop.h>
 #include "Type.h"
 #include "Util.h"
 
-static void HandleError( cudaError_t err,
-    const char *file,
-    int line ) {
-  if (err != cudaSuccess) {
-    printf( "%s in %s at line %d\n", cudaGetErrorString( err ),
-        file, line );
-    exit( EXIT_FAILURE );
-  }
-}
+static uint16_t win_w, win_h;
+static GLuint pbo = 0;
+static GLuint textureID = 0;
+static camera_t* d_camera;
+static sphere_t* d_spheres;
+static light_t* d_lights;
+static float* d_img_buffer;
+static int block_width = 16;
+static dim3 thread_dim;
+static dim3 block_dim;
+static Timer timer;
 
-#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
+void display();
+void keyboard(unsigned char key, int x, int y);
+void mouse(int button, int state, int x, int y);
+void motion(int x, int y);
 
-void draw_scene(
+void initialize_cuda_context(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h,
-   bool cpu_mode
+   camera_t* camera, uint16_t img_w, uint16_t img_h,
 );
-void draw_scene_cpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-);
-void draw_scene_gpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-);
+void draw_scene();
+void destroy_cuda_context();
+void createPBO(GLuint* pbo, uint16_t img_w, uint16_t img_h);
+void deletePBO(GLuint* pbo);
+void createTexture(GLuint* tex, unsigned int img_w, unsigned int img_h);
+void deleteTexture(GLuint* tex);
 
 __host__ __device__ void get_primary_ray_direction(
    camera_t* camera,
@@ -184,49 +184,26 @@ __global__ void draw_scene_kernel(
    }
 }
 
-void draw_scene_cpu(
+void initialize_cuda_context(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
+   camera_t* camera, uint16_t img_w, uint16_t img_h
 ) {
-   uint64_t rays_cast = 0;
-
-   for (uint16_t x = 0; x < img_w; ++x) {
-      for (uint16_t y = 0; y < img_h; ++y) {
-         cast_primary_ray(
-            lights, light_count, spheres, sphere_count,
-            camera, img_buffer, img_w, img_h, x, y
-         );
-         ++rays_cast;
-      }
-
-      if (x % (img_w / 25) == 0) {
-         float complete = (x / (float)img_w);
-         printf("%d%% complete...\n", (int)(complete * 100.0f));
-      }
+   int devCount = 0;
+   cudaGetDeviceCount(&devCount);
+   if (devCount < 1) {
+      printf("No CUDA devices detected\n");
+      exit(EXIT_FAILURE);
    }
+   cudaGLSetGLDevice(0);
 
-   printf("DONE: %llu rays cast\n", (long long unsigned int)rays_cast);
-}
-
-void draw_scene_gpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-) {
-   camera_t* d_camera;
-   sphere_t* d_spheres;
-   light_t* d_lights;
-   float* d_img_buffer;
-   cudaEvent_t start, stop;
-   float elapsedTime;
+   createPBO(&pbo, img_w, img_h);
+   createTexture(&textureID, img_w, img_h);
 
    cudaMalloc((void**)&d_camera, sizeof(camera_t));
    cudaMalloc((void**)&d_spheres, sizeof(sphere_t) * sphere_count);
    cudaMalloc((void**)&d_lights, sizeof(light_t) * light_count);
-   cudaMalloc((void**)&d_img_buffer, sizeof(float) * img_w * img_h * 3);
+   /* cudaMalloc((void**)&d_img_buffer, sizeof(float) * img_w * img_h * 3); */
 
    cudaMemcpy(d_camera, camera, sizeof(camera_t), cudaMemcpyHostToDevice);
    cudaMemcpy(
@@ -237,69 +214,144 @@ void draw_scene_gpu(
       d_lights, lights, sizeof(light_t) * light_count,
       cudaMemcpyHostToDevice
    );
-   cudaMemcpy(
-      d_img_buffer, img_buffer, sizeof(float) * img_w * img_h * 3,
-      cudaMemcpyHostToDevice
-   );
 
-   int block_width = 16;
-   dim3 threads = dim3(block_width, block_width);
-   dim3 blocks = dim3(
+   thread_dim = dim3(block_width, block_width);
+   block_dim = dim3(
       img_w / block_width + ((img_w % block_width) ? 1 : 0),
       img_h / block_width + ((img_h % block_width) ? 1 : 0)
    );
 
-   /* start timing */
-   HANDLE_ERROR(cudaEventCreate(&start));
-   HANDLE_ERROR(cudaEventCreate(&stop));
-   HANDLE_ERROR(cudaEventRecord(start, 0));
+   win_w = img_w;
+   win_h = img_h;
+}
 
-   draw_scene_kernel<<<blocks,threads>>>(
+void draw_scene() {
+   float *dptr = NULL;
+   cudaGLMapBufferObject((void**)&dptr, pbo);
+
+   draw_scene_kernel<<<block_dim,thread_dim>>>(
       d_spheres, sphere_count, d_lights, light_count,
-      d_camera, d_img_buffer, img_w, img_h
+      d_camera, dptr, img_w, img_h
    );
+   cudaThreadSynchronize();
+   checkCUDAError("kernel failure");
 
-   cudaMemcpy(
-      img_buffer, d_img_buffer, sizeof(float) * img_w * img_h * 3,
-      cudaMemcpyDeviceToHost
-   );
+   cudaGLUnmapBufferObject(pbo);
+}
 
-   /* stop and print timing */
-   HANDLE_ERROR(cudaEventRecord( stop, 0 ));
-   HANDLE_ERROR(cudaEventSynchronize( stop ));
-   HANDLE_ERROR(cudaEventElapsedTime( &elapsedTime, start, stop ));
-   printf("GPU computation complete\n");
-   printf( "Time to generate:  %.1f ms\n", elapsedTime );
-   HANDLE_ERROR(cudaEventDestroy( start ));
-   HANDLE_ERROR(cudaEventDestroy( stop ));
-
+void destroy_cuda_context() {
    cudaFree(d_camera);
    cudaFree(d_spheres);
    cudaFree(d_lights);
-   cudaFree(d_img_buffer);
+   /* cudaFree(d_img_buffer); */
+
+  if (pbo) deletePBO(&pbo);
+  if (textureID) deleteTexture(&textureID);
 }
 
-void draw_scene(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h,
-   bool cpu_mode
-) {
-   camera->fov[0] *= M_PI / 180.0f; // degrees to radians
-   camera->fov[1] = camera->fov[0] * img_h / (float)img_w;
+void createPBO(GLuint* pbo, uint16_t img_w, uint16_t img_h) {
+   if (pbo) {
+      int num_texels = img_w * img_h;
+      int num_values = num_texels * 3;
+      int size_tex_data = sizeof(GLubyte) * num_values;
 
-   if (cpu_mode) {
-      draw_scene_cpu(
-         lights, light_count, spheres, sphere_count,
-         camera, img_buffer, img_w, img_h
-      );
-   } else {
-      draw_scene_gpu(
-         lights, light_count, spheres, sphere_count,
-         camera, img_buffer, img_w, img_h
-      );
+      glGenBuffers(1, pbo);
+      glBindBuffer(GL_PIXEL_UNPACK_BUFFER, *pbo);
+      glBufferData(GL_PIXEL_UNPACK_BUFFER, size_tex_data, NULL, GL_DYNAMIC_COPY);
+      cudaGLRegisterBufferObject(*pbo);
    }
+}
+
+void deletePBO(GLuint* pbo) {
+   if (pbo) {
+      cudaGLUnregisterBufferObject(*pbo);
+      glBindBuffer(GL_ARRAY_BUFFER, *pbo);
+      glDeleteBuffers(1, pbo);
+      *pbo = 0;
+   }
+}
+
+void createTexture(GLuint* tex, unsigned int img_w, unsigned int img_h) {
+   if (tex) {
+      glEnable(GL_TEXTURE_2D);
+      glGenTextures(1, tex);
+      glBindTexture(GL_TEXTURE_2D, *tex);
+
+      glTexImage2D(
+         GL_TEXTURE_2D, 0, GL_RGBA8,
+         img_w, img_h, 0,
+         GL_BGRA, GL_UNSIGNED_BYTE, NULL
+      );
+
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+      glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+      // Note: GL_TEXTURE_RECTANGLE_ARB may be used instead of
+      // GL_TEXTURE_2D for improved performance if linear interpolation is
+      // not desired. Replace GL_LINEAR with GL_NEAREST in the
+      // glTexParameteri() call
+   }
+}
+
+void deleteTexture(GLuint* tex) {
+   if (tex) {
+      glDeleteTextures(1, tex);
+      *tex = 0;
+   }
+}
+
+void display_fps(Timer* timer) {
+   static int call_counter = 0;
+   static int call_threshold = 100;
+   static char str[256];
+
+   if (call_counter == call_threshold) {
+      float ms = timer->get() / 1000000.0f;
+      sprintf(str, "%3.4f FPS - %3.4f MS", 1000.0f / ms, ms);
+      glutSetWindowTitle(str);
+      call_counter = 0;
+   }
+
+   ++call_counter;
+}
+
+void display() {
+   timer.start();
+
+   draw_scene();
+
+   glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+   glBindTexture(GL_TEXTURE_2D, textureID);
+
+   glTexSubImage2D(
+      GL_TEXTURE_2D, 0, 0,
+      0, win_w, win_h,
+      GL_RGBA, GL_UNSIGNED_BYTE, NULL
+   );
+
+   glBegin(GL_QUADS);
+   glTexCoord2f(0.0f,1.0f); glVertex3f(0.0f,0.0f,0.0f);
+   glTexCoord2f(0.0f,0.0f); glVertex3f(0.0f,1.0f,0.0f);
+   glTexCoord2f(1.0f,0.0f); glVertex3f(1.0f,1.0f,0.0f);
+   glTexCoord2f(1.0f,1.0f); glVertex3f(1.0f,0.0f,0.0f);
+   glEnd();
+
+   glutSwapBuffers();
+
+   timer.stop();
+
+   display_fps(&timer);
+}
+
+void keyboard(unsigned char key, int x, int y) {
+   glutPostRedisplay();
+}
+
+void mouse(int button, int state, int x, int y) {
+   glutPostRedisplay();
+}
+
+void motion(int x, int y) {
+   glutPostRedisplay();
 }
 
 #endif

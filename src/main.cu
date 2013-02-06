@@ -3,27 +3,29 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <tclap/CmdLine.h>
+#include <GL/glut.h>
+#include <GL/freeglut.h>
 
 int main(int argc, char** argv) {
    if(!parse_cmd_line(argc, argv)){
       return EXIT_FAILURE;
    }
 
+   create_window(argc, argv, img_w, img_h);
    create_scene(
       &camera, camera_filename,
       &light_vec, light_filename,
       &sphere_vec, geometry_filename
    );
-   img_buffer = (float*)malloc(sizeof(float) * img_w * img_h * 3);
-   draw_scene(
+   initialize_cuda_context(
       &light_vec.front(), light_vec.size(),
       &sphere_vec.front(), sphere_vec.size(),
-      &camera, img_buffer,
-      img_w, img_h,
-      cpu_mode
+      &camera, img_w, img_h
    );
-   write_tga(img_buffer, img_w, img_h, output_filename);
-   free(img_buffer);
+
+   glutMainLoop();
+
+   destroy_cuda_context();
 
    return EXIT_SUCCESS;
 }
@@ -34,11 +36,9 @@ bool parse_cmd_line(int argc, char** argv) {
    std::string camera_val;
    std::string light_val;
    std::string geometry_val;
-   std::string output_val;
-   bool cpu_val;
 
    try {
-      TCLAP::CmdLine cmd("Awesome Ray Tracer", ' ', "", false);
+      TCLAP::CmdLine cmd(TITLE_STR, ' ', "", false);
 
       TCLAP::ValueArg<int32_t> width_arg(
          "w", "width", "Output image width",
@@ -60,22 +60,12 @@ bool parse_cmd_line(int argc, char** argv) {
          "g", "geometry", "Filename to use to generate geometry",
          false, dflt_geometry_filename, "string"
       );
-      TCLAP::ValueArg<std::string> output_arg(
-         "o", "output", "Filename of output image",
-         false, dflt_output_filename, "string"
-      );
-      TCLAP::SwitchArg cpu_switch(
-         "s", "cpu", "Use the CPU for image processing",
-         dflt_cpu_mode
-      );
 
       cmd.add(width_arg);
       cmd.add(height_arg);
       cmd.add(camera_arg);
       cmd.add(light_arg);
       cmd.add(geometry_arg);
-      cmd.add(output_arg);
-      cmd.add(cpu_switch);
 
       cmd.parse(argc, argv);
 
@@ -84,8 +74,6 @@ bool parse_cmd_line(int argc, char** argv) {
       camera_val = camera_arg.getValue();
       light_val = light_arg.getValue();
       geometry_val = geometry_arg.getValue();
-      output_val = output_arg.getValue();
-      cpu_val = cpu_switch.getValue();
    } catch (TCLAP::ArgException& e) {
       fprintf(stderr,
          "error: %s for arg %s\n", e.error().c_str(), e.argId().c_str()
@@ -123,9 +111,30 @@ bool parse_cmd_line(int argc, char** argv) {
    camera_filename = camera_val;
    light_filename = light_val;
    geometry_filename = geometry_val;
-   output_filename = output_val;
-
-   cpu_mode = cpu_val;
 
    return true;
+}
+
+void create_window(
+   int argc, char** argv,
+   uint16_t win_w, uint16_t, win_h
+) {
+   glutInit(&argc, argv);
+   glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);
+   glutInitWindowSize(win_w, win_h);
+   glutCreateWindow(TITLE_STR);
+
+   glutDisplayFunc(display);
+   glutKeyboardFunc(keyboard);
+   glutMouseFunc(mouse);
+   glutMotionFunc(motion);
+
+   glViewport(0, 0, win_w, win_h);
+   glClearColor(0.0, 0.0, 0.0, 1.0);
+   glDisable(GL_DEPTH_TEST);
+   glMatrixMode(GL_MODELVIEW);
+   glLoadIdentity();
+   glMatrixMode(GL_PROJECTION);
+   glLoadIdentity();
+   glOrtho(0.0f, 1.0f, 0.0f, 1.0f, 0.0f, 1.0f);
 }

@@ -1,8 +1,9 @@
 SRC_DIR = src
 OBJ_DIR = obj
 
-LIBS = m
+LIBS = m rt GL GLU glut
 INCS = $(SRC_DIR) third_party/tclap/include
+DEFS = GL_GLEXT_PROTOTYPES
 
 SRCS = $(shell find $(SRC_DIR) -name "*.cu")
 DEPS = $(shell find $(SRC_DIR) -name "*.h")
@@ -13,7 +14,7 @@ EXEC = $(shell basename `pwd`)
 
 
 CXX = nvcc
-CFLAGS = -arch=compute_20 -code=sm_20 $(foreach d,$(INCS),-I$d)
+CFLAGS = -arch=compute_20 -code=sm_20 $(foreach d,$(DEFS),-D$d) $(foreach d,$(INCS),-I$d)
 LD = nvcc
 LDFLAGS =
 
