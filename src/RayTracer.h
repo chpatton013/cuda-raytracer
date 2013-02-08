@@ -7,20 +7,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <cuda.h>
+#include "Timer.h"
 #include "Type.h"
 #include "Util.h"
-
-static void HandleError( cudaError_t err,
-    const char *file,
-    int line ) {
-  if (err != cudaSuccess) {
-    printf( "%s in %s at line %d\n", cudaGetErrorString( err ),
-        file, line );
-    exit( EXIT_FAILURE );
-  }
-}
-
-#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
 
 void draw_scene(
    light_t* lights, uint16_t light_count,
@@ -220,8 +209,6 @@ void draw_scene_gpu(
    sphere_t* d_spheres;
    light_t* d_lights;
    float* d_img_buffer;
-   cudaEvent_t start, stop;
-   float elapsedTime;
 
    cudaMalloc((void**)&d_camera, sizeof(camera_t));
    cudaMalloc((void**)&d_spheres, sizeof(sphere_t) * sphere_count);
@@ -249,29 +236,22 @@ void draw_scene_gpu(
       img_h / block_width + ((img_h % block_width) ? 1 : 0)
    );
 
-   /* start timing */
-   HANDLE_ERROR(cudaEventCreate(&start));
-   HANDLE_ERROR(cudaEventCreate(&stop));
-   HANDLE_ERROR(cudaEventRecord(start, 0));
+   static Timer timer;
+   timer.start();
 
    draw_scene_kernel<<<blocks,threads>>>(
       d_spheres, sphere_count, d_lights, light_count,
       d_camera, d_img_buffer, img_w, img_h
    );
+   cudaThreadSynchronize();
+
+   timer.stop();
+   printf("Computation complete: %lf ms\n", timer.get() / 1000000.0);
 
    cudaMemcpy(
       img_buffer, d_img_buffer, sizeof(float) * img_w * img_h * 3,
       cudaMemcpyDeviceToHost
    );
-
-   /* stop and print timing */
-   HANDLE_ERROR(cudaEventRecord( stop, 0 ));
-   HANDLE_ERROR(cudaEventSynchronize( stop ));
-   HANDLE_ERROR(cudaEventElapsedTime( &elapsedTime, start, stop ));
-   printf("GPU computation complete\n");
-   printf( "Time to generate:  %.1f ms\n", elapsedTime );
-   HANDLE_ERROR(cudaEventDestroy( start ));
-   HANDLE_ERROR(cudaEventDestroy( stop ));
 
    cudaFree(d_camera);
    cudaFree(d_spheres);
