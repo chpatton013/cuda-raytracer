@@ -10,24 +10,22 @@
 #include "RayTracer.h"
 
 // Defaults
-static const uint16_t max_img_w = 65535;
-static const uint16_t max_img_h = 65535;
-static const uint16_t dflt_img_w = 1280;
-static const uint16_t dflt_img_h = 720;
+static const uint16_t max_win_w = 12800;
+static const uint16_t max_win_h = 12800;
+static const uint16_t dflt_win_w = 1280;
+static const uint16_t dflt_win_h = 720;
 static const std::string dflt_camera_filename ="camera.txt";
 static const std::string dflt_light_filename ="lights.txt";
 static const std::string dflt_geometry_filename ="geometry.txt";
 static const std::string dflt_output_filename ="output.tga";
-static const bool dflt_cpu_mode = false;
 
 // Globals
-static uint16_t img_w;
-static uint16_t img_h;
+static uint16_t win_w;
+static uint16_t win_h;
 static std::string camera_filename;
 static std::string light_filename;
 static std::string geometry_filename;
 static std::string output_filename;
-static bool cpu_mode;
 
 // Scene Data
 static camera_t camera;

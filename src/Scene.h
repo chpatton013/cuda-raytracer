@@ -1,23 +1,25 @@
 #ifndef _SCENE_H_
 #define _SCENE_H_
 
+#include <stdint.h>
 #include <string>
 #include <vector>
 #include "Type.h"
 
-void create_camera(
+bool create_camera(
       camera_t* camera, std::string filename
 );
-void create_lights(
+bool create_lights(
       std::vector<light_t>* light_vec, std::string filename
 );
-void create_spheres(
+bool create_spheres(
       std::vector<sphere_t>* sphere_vec, std::string filename
 );
-void create_scene(
+bool create_scene(
       camera_t* camera, std::string camera_filename,
       std::vector<light_t>* light_vec, std::string light_filename,
-      std::vector<sphere_t>* sphere_vec, std::string sphere_filename
+      std::vector<sphere_t>* sphere_vec, std::string sphere_filename,
+      uint16_t win_w, uint16_t win_h
 );
 
 float get_next_float(std::ifstream& filestream);

@@ -15,19 +15,6 @@ void draw_scene(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
    camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h,
-   bool cpu_mode
-);
-void draw_scene_cpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-);
-void draw_scene_gpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
    uint16_t img_w, uint16_t img_h
 );
 
@@ -173,33 +160,7 @@ __global__ void draw_scene_kernel(
    }
 }
 
-void draw_scene_cpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-) {
-   uint64_t rays_cast = 0;
-
-   for (uint16_t x = 0; x < img_w; ++x) {
-      for (uint16_t y = 0; y < img_h; ++y) {
-         cast_primary_ray(
-            lights, light_count, spheres, sphere_count,
-            camera, img_buffer, img_w, img_h, x, y
-         );
-         ++rays_cast;
-      }
-
-      if (x % (img_w / 25) == 0) {
-         float complete = (x / (float)img_w);
-         printf("%d%% complete...\n", (int)(complete * 100.0f));
-      }
-   }
-
-   printf("DONE: %llu rays cast\n", (long long unsigned int)rays_cast);
-}
-
-void draw_scene_gpu(
+void draw_scene(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
    camera_t* camera, float* img_buffer,
@@ -257,29 +218,6 @@ void draw_scene_gpu(
    cudaFree(d_spheres);
    cudaFree(d_lights);
    cudaFree(d_img_buffer);
-}
-
-void draw_scene(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h,
-   bool cpu_mode
-) {
-   camera->fov[0] *= M_PI / 180.0f; // degrees to radians
-   camera->fov[1] = camera->fov[0] * img_h / (float)img_w;
-
-   if (cpu_mode) {
-      draw_scene_cpu(
-         lights, light_count, spheres, sphere_count,
-         camera, img_buffer, img_w, img_h
-      );
-   } else {
-      draw_scene_gpu(
-         lights, light_count, spheres, sphere_count,
-         camera, img_buffer, img_w, img_h
-      );
-   }
 }
 
 #endif

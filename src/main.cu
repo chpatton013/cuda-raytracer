@@ -5,24 +5,26 @@
 #include <tclap/CmdLine.h>
 
 int main(int argc, char** argv) {
-   if(!parse_cmd_line(argc, argv)){
+   if (!parse_cmd_line(argc, argv)) {
+      return EXIT_FAILURE;
+   }
+   if (!create_scene(
+      &camera, camera_filename,
+      &light_vec, light_filename,
+      &sphere_vec, geometry_filename,
+      win_w, win_h
+   )) {
       return EXIT_FAILURE;
    }
 
-   create_scene(
-      &camera, camera_filename,
-      &light_vec, light_filename,
-      &sphere_vec, geometry_filename
-   );
-   img_buffer = (float*)malloc(sizeof(float) * img_w * img_h * 3);
+   img_buffer = (float*)malloc(sizeof(float) * win_w * win_h * 3);
    draw_scene(
       &light_vec.front(), light_vec.size(),
       &sphere_vec.front(), sphere_vec.size(),
       &camera, img_buffer,
-      img_w, img_h,
-      cpu_mode
+      win_w, win_h
    );
-   write_tga(img_buffer, img_w, img_h, output_filename);
+   write_tga(img_buffer, win_w, win_h, output_filename);
    free(img_buffer);
 
    return EXIT_SUCCESS;
@@ -35,18 +37,17 @@ bool parse_cmd_line(int argc, char** argv) {
    std::string light_val;
    std::string geometry_val;
    std::string output_val;
-   bool cpu_val;
 
    try {
       TCLAP::CmdLine cmd("Awesome Ray Tracer", ' ', "", false);
 
       TCLAP::ValueArg<int32_t> width_arg(
          "w", "width", "Output image width",
-         false, dflt_img_w, "positive integer"
+         false, dflt_win_w, "positive integer"
       );
       TCLAP::ValueArg<int32_t> height_arg(
          "h", "height", "Output image height",
-         false, dflt_img_h, "positive integer"
+         false, dflt_win_h, "positive integer"
       );
       TCLAP::ValueArg<std::string> camera_arg(
          "c", "camera", "Filename to use to generate the camera",
@@ -64,10 +65,6 @@ bool parse_cmd_line(int argc, char** argv) {
          "o", "output", "Filename of output image",
          false, dflt_output_filename, "string"
       );
-      TCLAP::SwitchArg cpu_switch(
-         "s", "cpu", "Use the CPU for image processing",
-         dflt_cpu_mode
-      );
 
       cmd.add(width_arg);
       cmd.add(height_arg);
@@ -75,7 +72,6 @@ bool parse_cmd_line(int argc, char** argv) {
       cmd.add(light_arg);
       cmd.add(geometry_arg);
       cmd.add(output_arg);
-      cmd.add(cpu_switch);
 
       cmd.parse(argc, argv);
 
@@ -85,7 +81,6 @@ bool parse_cmd_line(int argc, char** argv) {
       light_val = light_arg.getValue();
       geometry_val = geometry_arg.getValue();
       output_val = output_arg.getValue();
-      cpu_val = cpu_switch.getValue();
    } catch (TCLAP::ArgException& e) {
       fprintf(stderr,
          "error: %s for arg %s\n", e.error().c_str(), e.argId().c_str()
@@ -93,30 +88,30 @@ bool parse_cmd_line(int argc, char** argv) {
       return false;
    }
 
-   // check bounds on image width
-   if (width_val > max_img_w) {
+   // check bounds on window width
+   if (width_val > max_win_w) {
       fprintf(stderr,
-         "error: image width must be less than %d\n", max_img_w
+         "error: window width must be less than %d\n", max_win_w
       );
       return false;
    } else if (width_val <= 0) {
-      fprintf(stderr, "error: image width must be positive\n");
+      fprintf(stderr, "error: window width must be positive\n");
       return false;
    } else {
-      img_w = width_val;
+      win_w = width_val;
    }
 
-   // check bounds on image height
-   if (height_val > max_img_h) {
+   // check bounds on window height
+   if (height_val > max_win_h) {
       fprintf(stderr,
-         "error: image height must be less than %d\n", max_img_h
+         "error: window height must be less than %d\n", max_win_h
       );
       return false;
    } else if (height_val <= 0) {
-      fprintf(stderr, "error: image height must be positive\n");
+      fprintf(stderr, "error: window height must be positive\n");
       return false;
    } else {
-      img_h = height_val;
+      win_h = height_val;
    }
 
    // assume files exist and are readable
@@ -125,7 +120,6 @@ bool parse_cmd_line(int argc, char** argv) {
    geometry_filename = geometry_val;
    output_filename = output_val;
 
-   cpu_mode = cpu_val;
 
    return true;
 }

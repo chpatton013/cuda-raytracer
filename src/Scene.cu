@@ -5,8 +5,8 @@
 #include <stdlib.h>
 #include <fstream>
 
-void create_camera(
-      camera_t* camera, std::string filename
+bool create_camera(
+      camera_t* camera, std::string filename, uint16_t win_w, uint16_t win_h
 ) {
    std::ifstream filestream(filename.c_str());
    bool success =
@@ -16,12 +16,14 @@ void create_camera(
       get_next_vector(filestream, camera->z) &&
       !isnan(camera->fov[0] = get_next_float(filestream));
 
-   if (!success) {
-      fprintf(stderr, "error: failed to create camera\n");
-      exit(EXIT_FAILURE);
+   if (success) {
+      camera->fov[0] *= M_PI / 180.0f;
+      camera->fov[1] = camera->fov[0] * (win_h / (float)win_w);
    }
+
+   return success;
 }
-void create_lights(
+bool create_lights(
       std::vector<light_t>* light_vec, std::string filename
 ) {
    std::ifstream filestream(filename.c_str());
@@ -36,8 +38,10 @@ void create_lights(
          light_vec->push_back(light);
       }
    } while (success);
+
+   return true;
 }
-void create_spheres(
+bool create_spheres(
       std::vector<sphere_t>* sphere_vec, std::string filename
 ) {
    std::ifstream filestream(filename.c_str());
@@ -57,15 +61,18 @@ void create_spheres(
          sphere_vec->push_back(sphere);
       }
    } while (success);
+
+   return true;
 }
-void create_scene(
+bool create_scene(
       camera_t* camera, std::string camera_filename,
       std::vector<light_t>* light_vec, std::string light_filename,
-      std::vector<sphere_t>* sphere_vec, std::string sphere_filename
+      std::vector<sphere_t>* sphere_vec, std::string sphere_filename,
+      uint16_t win_w, uint16_t win_h
 ) {
-   create_camera(camera, camera_filename);
-   create_lights(light_vec, light_filename);
-   create_spheres(sphere_vec, sphere_filename);
+   return create_camera(camera, camera_filename, win_w, win_h) &&
+          create_lights(light_vec, light_filename) &&
+          create_spheres(sphere_vec, sphere_filename);
 }
 
 float get_next_float(std::ifstream& filestream) {
