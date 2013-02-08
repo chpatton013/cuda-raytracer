@@ -248,7 +248,6 @@ void destroy_cuda_context() {
    cudaFree(d_camera);
    cudaFree(d_spheres);
    cudaFree(d_lights);
-   /* cudaFree(d_img_buffer); */
 
   if (pbo) deletePBO(&pbo);
   if (textureID) deleteTexture(&textureID);
@@ -345,6 +344,8 @@ void display() {
    timer.stop();
 
    display_fps(&timer);
+
+   glutPostRedisplay();
 }
 
 void keyboard(unsigned char key, int x, int y) {

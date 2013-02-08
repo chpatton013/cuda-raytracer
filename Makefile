@@ -19,7 +19,7 @@ LD = nvcc
 LDFLAGS =
 
 
-.PHONY: all debug test release profile prepare clean remove
+.PHONY: all debug release profile prepare clean remove run
 
 all: debug
 run: all
@@ -30,7 +30,7 @@ profile: LDFLAGS += -pg
 
 debug release profile: $(EXEC)
 
-test: $(EXEC)
+run: $(EXEC)
 	./$(EXEC)
 
 prepare:
