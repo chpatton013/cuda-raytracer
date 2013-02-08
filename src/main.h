@@ -35,7 +35,7 @@ static std::vector<sphere_t> sphere_vec;
 bool parse_cmd_line(int argc, char** argv);
 void create_window(
    int argc, char** argv,
-   uint16_t win_w, uint16_t, win_h
+   uint16_t win_w, uint16_t win_h
 );
 
 #endif

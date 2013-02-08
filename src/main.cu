@@ -3,8 +3,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <tclap/CmdLine.h>
-#include <GL/glut.h>
-#include <GL/freeglut.h>
 
 int main(int argc, char** argv) {
    if(!parse_cmd_line(argc, argv)){
@@ -15,7 +13,8 @@ int main(int argc, char** argv) {
    create_scene(
       &camera, camera_filename,
       &light_vec, light_filename,
-      &sphere_vec, geometry_filename
+      &sphere_vec, geometry_filename,
+      img_w, img_h
    );
    initialize_cuda_context(
       &light_vec.front(), light_vec.size(),
@@ -117,7 +116,7 @@ bool parse_cmd_line(int argc, char** argv) {
 
 void create_window(
    int argc, char** argv,
-   uint16_t win_w, uint16_t, win_h
+   uint16_t win_w, uint16_t win_h
 ) {
    glutInit(&argc, argv);
    glutInitDisplayMode(GLUT_RGBA | GLUT_DOUBLE);

@@ -10,10 +10,14 @@
 #include <cuda.h>
 #include <cuda_runtime_api.h>
 #include <cuda_gl_interop.h>
+#include <GL/glut.h>
+#include <GL/freeglut.h>
+#include "Timer.h"
 #include "Type.h"
 #include "Util.h"
 
 static uint16_t win_w, win_h;
+static uint16_t sphere_c, light_c;
 static GLuint pbo = 0;
 static GLuint textureID = 0;
 static camera_t* d_camera;
@@ -33,7 +37,7 @@ void motion(int x, int y);
 void initialize_cuda_context(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, uint16_t img_w, uint16_t img_h,
+   camera_t* camera, uint16_t img_w, uint16_t img_h
 );
 void draw_scene();
 void destroy_cuda_context();
@@ -203,7 +207,6 @@ void initialize_cuda_context(
    cudaMalloc((void**)&d_camera, sizeof(camera_t));
    cudaMalloc((void**)&d_spheres, sizeof(sphere_t) * sphere_count);
    cudaMalloc((void**)&d_lights, sizeof(light_t) * light_count);
-   /* cudaMalloc((void**)&d_img_buffer, sizeof(float) * img_w * img_h * 3); */
 
    cudaMemcpy(d_camera, camera, sizeof(camera_t), cudaMemcpyHostToDevice);
    cudaMemcpy(
@@ -223,6 +226,9 @@ void initialize_cuda_context(
 
    win_w = img_w;
    win_h = img_h;
+
+   sphere_c = sphere_count;
+   light_c = light_count;
 }
 
 void draw_scene() {
@@ -230,11 +236,10 @@ void draw_scene() {
    cudaGLMapBufferObject((void**)&dptr, pbo);
 
    draw_scene_kernel<<<block_dim,thread_dim>>>(
-      d_spheres, sphere_count, d_lights, light_count,
-      d_camera, dptr, img_w, img_h
+      d_spheres, sphere_c, d_lights, light_c,
+      d_camera, dptr, win_w, win_h
    );
    cudaThreadSynchronize();
-   checkCUDAError("kernel failure");
 
    cudaGLUnmapBufferObject(pbo);
 }

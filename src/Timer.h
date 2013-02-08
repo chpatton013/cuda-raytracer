@@ -28,7 +28,7 @@ class Timer {
          clock_gettime(TIMER_CLOCK, &time_end);
       }
 
-      uint64_t result() {
+      uint64_t get() {
          uint64_t duration = 0;
 
          if (time_end.tv_nsec < time_begin.tv_nsec) {
@@ -45,7 +45,7 @@ class Timer {
    private:
       struct timespec time_begin;
       struct timespec time_end;
-}
+};
 
 #undef ONE_BILLION
 #undef TIMER_CLOCK
