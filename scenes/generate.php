@@ -43,7 +43,7 @@ class Generator {
          'z_far' => $z_far,
          'z_focal' => $z_focal,
          'hfov' => $hfov,
-         'zfov' => $vfov,
+         'vfov' => $vfov,
 
          'num_spheres' => $num_spheres,
          'min_radius' => $min_radius,
@@ -127,7 +127,7 @@ class Generator {
       $x = $position[0] * (2 * $max_x) - $max_x;
       $y = $position[1] * (2 * $max_y) - $max_y;
 
-      return array($x,$y, $z);
+      return array($x, $y, $z);
    }
 
    private static function make_light($settings) {
@@ -173,7 +173,7 @@ class Generator {
          'ambient' => self::rand_vec(),
          'diffuse' => self::rand_vec(),
          'specular' => self::rand_vec(),
-         'shine' => self::unit_rand() * $max_shine
+         'shine' => self::rand_in_range(array(0, $max_shine))
       );
    }
    private static function make_spheres($settings) {
