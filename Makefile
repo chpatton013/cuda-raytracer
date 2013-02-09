@@ -1,8 +1,9 @@
 SRC_DIR = src
 OBJ_DIR = obj
 
-LIBS = m
+LIBS = m GL GLU glut
 INCS = $(SRC_DIR) third_party/tclap/include
+DEFS = GL_GLEXT_PROTOTYPES
 
 SRCS = $(shell find $(SRC_DIR) -name "*.cu")
 DEPS = $(shell find $(SRC_DIR) -name "*.h")
@@ -11,25 +12,23 @@ SRC_SUB_DIRS = $(shell find $(SRC_DIR) -type d)
 OBJ_SUB_DIRS = $(patsubst $(SRC_DIR)%,$(OBJ_DIR)%,$(SRC_SUB_DIRS))
 EXEC = $(shell basename `pwd`)
 
-
 CXX = nvcc
-CFLAGS = -arch=compute_20 -code=sm_20 $(foreach d,$(INCS),-I$d)
+CFLAGS = -arch=compute_20 -code=sm_21 $(foreach d,$(DEFS),-D$d) $(foreach d,$(INCS),-I$d)
 LD = nvcc
 LDFLAGS =
 
-
-.PHONY: all debug test release profile prepare clean remove
+.PHONY: all debug run release profile prepare clean remove
 
 all: debug
 run: all
 debug: CFLAGS += -g -DDEBUG
-release: CFLAGS += -O2 -DNDEBUG
-profile: CFLAGS += -g -pg -O2 -DNDEBUG
+release: CFLAGS += -O3 -DNDEBUG
+profile: CFLAGS += -g -pg -O3 -DNDEBUG
 profile: LDFLAGS += -pg
 
 debug release profile: $(EXEC)
 
-test: $(EXEC)
+run: $(EXEC)
 	./$(EXEC)
 
 prepare:

@@ -42,6 +42,16 @@ __host__ __device__ void zero_vector(float* v) {
    }
 }
 
+__host__ __device__ void clamp(float* v, float min, float max) {
+   for (int ndx = 0; ndx < 3; ++ndx) {
+      if (v[ndx] < min) {
+         v[ndx] = min;
+      } else if (v[ndx] > max) {
+         v[ndx] = max;
+      }
+   }
+}
+
 __host__ __device__ void copy(float* v_src, float* v_dest) {
    for (int ndx = 0; ndx < 3; ++ndx) {
       v_dest[ndx] = v_src[ndx];

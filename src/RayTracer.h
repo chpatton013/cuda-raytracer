@@ -10,32 +10,7 @@
 #include "Type.h"
 #include "Util.h"
 
-static void HandleError( cudaError_t err,
-    const char *file,
-    int line ) {
-  if (err != cudaSuccess) {
-    printf( "%s in %s at line %d\n", cudaGetErrorString( err ),
-        file, line );
-    exit( EXIT_FAILURE );
-  }
-}
-
-#define HANDLE_ERROR( err ) (HandleError( err, __FILE__, __LINE__ ))
-
 void draw_scene(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h,
-   bool cpu_mode
-);
-void draw_scene_cpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-);
-void draw_scene_gpu(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
    camera_t* camera, float* img_buffer,
@@ -144,7 +119,7 @@ __host__ __device__ void light_surface(
 __host__ __device__ void cast_primary_ray(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
+   camera_t* camera, uchar4* img_buffer,
    uint16_t img_w, uint16_t img_h,
    uint16_t x, uint16_t y
 ) {
@@ -164,13 +139,19 @@ __host__ __device__ void cast_primary_ray(
          camera, lights, light_count, color
       );
    }
-   copy(color, img_buffer + 3 * (y * img_w + x));
+
+   clamp(color, 0.0f, 1.0f);
+   int index = y * img_w + x;
+   img_buffer[index].x = (unsigned char)(color[0] * 255);
+   img_buffer[index].y = (unsigned char)(color[1] * 255);
+   img_buffer[index].z = (unsigned char)(color[2] * 255);
+   img_buffer[index].w = 255;
 }
 
 __global__ void draw_scene_kernel(
    sphere_t* d_spheres, uint16_t sphere_count,
    light_t* d_lights, uint16_t light_count,
-   camera_t* d_camera, float* d_img_buffer,
+   camera_t* d_camera, uchar4* d_img_buffer,
    uint16_t img_w, uint16_t img_h
 ) {
    int x = threadIdx.x + blockIdx.x * blockDim.x;
@@ -184,33 +165,8 @@ __global__ void draw_scene_kernel(
    }
 }
 
-void draw_scene_cpu(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h
-) {
-   uint64_t rays_cast = 0;
-
-   for (uint16_t x = 0; x < img_w; ++x) {
-      for (uint16_t y = 0; y < img_h; ++y) {
-         cast_primary_ray(
-            lights, light_count, spheres, sphere_count,
-            camera, img_buffer, img_w, img_h, x, y
-         );
-         ++rays_cast;
-      }
-
-      if (x % (img_w / 25) == 0) {
-         float complete = (x / (float)img_w);
-         printf("%d%% complete...\n", (int)(complete * 100.0f));
-      }
-   }
-
-   printf("DONE: %llu rays cast\n", (long long unsigned int)rays_cast);
-}
-
-void draw_scene_gpu(
+/*
+void draw_scene(
    light_t* lights, uint16_t light_count,
    sphere_t* spheres, uint16_t sphere_count,
    camera_t* camera, float* img_buffer,
@@ -219,14 +175,10 @@ void draw_scene_gpu(
    camera_t* d_camera;
    sphere_t* d_spheres;
    light_t* d_lights;
-   float* d_img_buffer;
-   cudaEvent_t start, stop;
-   float elapsedTime;
 
    cudaMalloc((void**)&d_camera, sizeof(camera_t));
    cudaMalloc((void**)&d_spheres, sizeof(sphere_t) * sphere_count);
    cudaMalloc((void**)&d_lights, sizeof(light_t) * light_count);
-   cudaMalloc((void**)&d_img_buffer, sizeof(float) * img_w * img_h * 3);
 
    cudaMemcpy(d_camera, camera, sizeof(camera_t), cudaMemcpyHostToDevice);
    cudaMemcpy(
@@ -237,10 +189,6 @@ void draw_scene_gpu(
       d_lights, lights, sizeof(light_t) * light_count,
       cudaMemcpyHostToDevice
    );
-   cudaMemcpy(
-      d_img_buffer, img_buffer, sizeof(float) * img_w * img_h * 3,
-      cudaMemcpyHostToDevice
-   );
 
    int block_width = 16;
    dim3 threads = dim3(block_width, block_width);
@@ -249,57 +197,15 @@ void draw_scene_gpu(
       img_h / block_width + ((img_h % block_width) ? 1 : 0)
    );
 
-   /* start timing */
-   HANDLE_ERROR(cudaEventCreate(&start));
-   HANDLE_ERROR(cudaEventCreate(&stop));
-   HANDLE_ERROR(cudaEventRecord(start, 0));
-
    draw_scene_kernel<<<blocks,threads>>>(
       d_spheres, sphere_count, d_lights, light_count,
       d_camera, d_img_buffer, img_w, img_h
    );
 
-   cudaMemcpy(
-      img_buffer, d_img_buffer, sizeof(float) * img_w * img_h * 3,
-      cudaMemcpyDeviceToHost
-   );
-
-   /* stop and print timing */
-   HANDLE_ERROR(cudaEventRecord( stop, 0 ));
-   HANDLE_ERROR(cudaEventSynchronize( stop ));
-   HANDLE_ERROR(cudaEventElapsedTime( &elapsedTime, start, stop ));
-   printf("GPU computation complete\n");
-   printf( "Time to generate:  %.1f ms\n", elapsedTime );
-   HANDLE_ERROR(cudaEventDestroy( start ));
-   HANDLE_ERROR(cudaEventDestroy( stop ));
-
    cudaFree(d_camera);
    cudaFree(d_spheres);
    cudaFree(d_lights);
-   cudaFree(d_img_buffer);
 }
-
-void draw_scene(
-   light_t* lights, uint16_t light_count,
-   sphere_t* spheres, uint16_t sphere_count,
-   camera_t* camera, float* img_buffer,
-   uint16_t img_w, uint16_t img_h,
-   bool cpu_mode
-) {
-   camera->fov[0] *= M_PI / 180.0f; // degrees to radians
-   camera->fov[1] = camera->fov[0] * img_h / (float)img_w;
-
-   if (cpu_mode) {
-      draw_scene_cpu(
-         lights, light_count, spheres, sphere_count,
-         camera, img_buffer, img_w, img_h
-      );
-   } else {
-      draw_scene_gpu(
-         lights, light_count, spheres, sphere_count,
-         camera, img_buffer, img_w, img_h
-      );
-   }
-}
+*/
 
 #endif

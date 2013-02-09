@@ -6,7 +6,8 @@
 #include <fstream>
 
 void create_camera(
-      camera_t* camera, std::string filename
+      camera_t* camera, std::string filename,
+      uint16_t win_w, uint16_t win_h
 ) {
    std::ifstream filestream(filename.c_str());
    bool success =
@@ -20,6 +21,9 @@ void create_camera(
       fprintf(stderr, "error: failed to create camera\n");
       exit(EXIT_FAILURE);
    }
+
+   camera->fov[0] *= M_PI / 180.0f;
+   camera->fov[1] = camera->fov[0] / (win_w / (float)win_h);
 }
 void create_lights(
       std::vector<light_t>* light_vec, std::string filename
@@ -61,9 +65,10 @@ void create_spheres(
 void create_scene(
       camera_t* camera, std::string camera_filename,
       std::vector<light_t>* light_vec, std::string light_filename,
-      std::vector<sphere_t>* sphere_vec, std::string sphere_filename
+      std::vector<sphere_t>* sphere_vec, std::string sphere_filename,
+      uint16_t win_w, uint16_t win_h
 ) {
-   create_camera(camera, camera_filename);
+   create_camera(camera, camera_filename, win_w, win_h);
    create_lights(light_vec, light_filename);
    create_spheres(sphere_vec, sphere_filename);
 }
