@@ -21,9 +21,11 @@ LDFLAGS =
 
 all: debug
 run: all
-debug: CFLAGS += -g -DDEBUG
-release: CFLAGS += -O3 -DNDEBUG
-profile: CFLAGS += -g -pg -O3 -DNDEBUG
+debug: CFLAGS += -g
+debug: DEFS += DEBUG
+release: CFLAGS += -O3
+profile: CFLAGS += -g -pg -O3
+release profile: DEFS += NDEBUG
 profile: LDFLAGS += -pg
 
 debug release profile: $(EXEC)
