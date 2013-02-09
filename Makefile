@@ -13,7 +13,7 @@ OBJ_SUB_DIRS = $(patsubst $(SRC_DIR)%,$(OBJ_DIR)%,$(SRC_SUB_DIRS))
 EXEC = $(shell basename `pwd`)
 
 CXX = nvcc
-CFLAGS = -arch=compute_20 -code=sm_21 $(foreach d,$(DEFS),-D$d) $(foreach d,$(INCS),-I$d)
+CFLAGS = -arch=compute_20 -code=sm_21 -Xptxas -dlcm=ca $(foreach d,$(DEFS),-D$d) $(foreach d,$(INCS),-I$d)
 LD = nvcc
 LDFLAGS =
 
