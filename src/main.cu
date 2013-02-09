@@ -227,6 +227,7 @@ void display() {
    display_fps(&timer);
 
    glutSwapBuffers();
+   glutPostRedisplay();
 }
 
 void display_texture(
