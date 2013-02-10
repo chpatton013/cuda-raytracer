@@ -52,6 +52,10 @@ __host__ __device__ void clamp(float* v, float min, float max) {
    }
 }
 
+__host__ __device__ bool equal(float* v1, float* v2) {
+   return v1[0] == v2[0] && v1[1] == v2[1] && v1[2] == v2[2];
+}
+
 __host__ __device__ void copy(float* v_src, float* v_dest) {
    for (int ndx = 0; ndx < 3; ++ndx) {
       v_dest[ndx] = v_src[ndx];
@@ -207,20 +211,8 @@ __host__ __device__ void get_sphere_normal(
    norm_i(normal);
 }
 
-__host__ __device__ float get_ray_sphere_intersection(
-   ray_t* ray, sphere_t* sphere
-) {
-   float* c = sphere->center;
-   float* d = ray->direction;
-   float* e = ray->origin;
-   float eMinusC[3];
-   sub(e, c, eMinusC);
-
-   float r = sphere->radius,
-         A = dot(d, d),
-         B = 2 * dot(d, eMinusC),
-         C = dot(eMinusC, eMinusC) - r * r,
-         discriminant = B * B - 4 * A * C;
+__host__ __device__ float quadratic_formula(float A, float B, float C) {
+   float discriminant = B * B - 4 * A * C;
 
    if (discriminant < 0.0f) {
       return -1.0f;
@@ -237,6 +229,40 @@ __host__ __device__ float get_ray_sphere_intersection(
    } else {
       return -B / (2 * A);
    }
+}
+
+__host__ __device__ float get_ray_sphere_intersection(
+   ray_t* ray, sphere_t* sphere
+) {
+   float* c = sphere->center;
+   float* d = ray->direction;
+   float* e = ray->origin;
+   float eMinusC[3];
+   sub(e, c, eMinusC);
+
+   float r = sphere->radius,
+         A = dot(d, d),
+         B = 2 * dot(d, eMinusC),
+         C = dot(eMinusC, eMinusC) - r * r;
+
+   return quadratic_formula(A, B, C);
+}
+
+__host__ __device__ float get_ray_light_intersection(
+   ray_t* ray, light_t* light
+) {
+   float* c = light->position;
+   float* d = ray->direction;
+   float* e = ray->origin;
+   float eMinusC[3];
+   sub(e, c, eMinusC);
+
+   float r = 0.1f,
+         A = dot(d, d),
+         B = 2 * dot(d, eMinusC),
+         C = dot(eMinusC, eMinusC) - r * r;
+
+   return quadratic_formula(A, B, C);
 }
 
 #endif

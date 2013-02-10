@@ -64,17 +64,21 @@ __host__ __device__ float get_closest_intersection(
 
    if (closest_sphere == NULL) {
       return -1.0f;
-   } else {
+   } else if (target != NULL) {
       *target = closest_sphere;
-      return closest_param;
    }
+
+   return closest_param;
 }
 
 __host__ __device__ void light_surface(
    ray_t* ray, float parameter, sphere_t* sphere,
    camera_t* camera, light_t* lights, uint16_t light_count,
+   sphere_t* spheres, uint16_t sphere_count,
    float* color
 ) {
+   const float EPSILON = 0.005f;
+
    float position[3];
    float surface_normal[3];
    float viewer_direction[3];
@@ -89,31 +93,56 @@ __host__ __device__ void light_surface(
 
    for (int ndx = 0; ndx < light_count; ++ndx) {
       float light_direction[3];
-      float reflected_direction[3];
 
       // light_direction = normalized(position - light position)
       sub(position, lights[ndx].position, light_direction);
       norm_i(light_direction);
 
-      // reflected = normalized(
-      //    (2 * (light_direction dot normal) * normal) - light_direction
-      // )
-      scale(
-         surface_normal,
-         (2 * dot(light_direction, surface_normal)),
-         reflected_direction
-      );
-      sub_i(reflected_direction, light_direction);
-      norm_i(reflected_direction);
+      ray_t light_ray;
+      scale(light_direction, -1.0f, light_ray.direction);
 
-      float lighting[3];
-      get_phong_lighting(
-         light_direction, surface_normal,
-         reflected_direction, viewer_direction,
-         &sphere->composition, lighting
+      float pos_delta[3];
+      scale(light_ray.direction, EPSILON, pos_delta);
+      add(position, pos_delta, light_ray.origin);
+
+      float light_dist = get_ray_light_intersection(&light_ray, &lights[ndx]);
+      float closest_sphere = get_closest_intersection(
+         &light_ray, spheres, sphere_count, NULL
       );
-      add_i(color, lighting);
+
+      bool shadowed = closest_sphere > EPSILON && closest_sphere < light_dist;
+      if (!shadowed) {
+         // reflected = normalized(
+         //    (2 * (light_direction dot normal) * normal) - light_direction
+         // )
+         float reflected_direction[3];
+         scale(
+            surface_normal,
+            (2 * dot(light_direction, surface_normal)),
+            reflected_direction
+         );
+         sub_i(reflected_direction, light_direction);
+         norm_i(reflected_direction);
+
+         float diffuse[3],
+               specular[3];
+         get_diffuse_lighting(
+            light_direction, surface_normal,
+            &sphere->composition, diffuse
+         );
+         get_specular_lighting(
+            reflected_direction, viewer_direction,
+            &sphere->composition, specular
+         );
+
+         add_i(color, diffuse);
+         add_i(color, specular);
+      }
    }
+
+   float ambient[3];
+   get_ambient_lighting(&sphere->composition, ambient);
+   add_i(color, ambient);
 }
 
 __host__ __device__ void cast_primary_ray(
@@ -136,7 +165,9 @@ __host__ __device__ void cast_primary_ray(
    if (intersection >= 0.0f) {
       light_surface(
          &ray, intersection, sphere,
-         camera, lights, light_count, color
+         camera, lights, light_count,
+         spheres, sphere_count,
+         color
       );
    }
 
