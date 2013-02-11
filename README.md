@@ -1,8 +1,7 @@
 Usage
 =====
-raytracer [-w <image_width>] [-h <image_height>] [-s]
- [-c <camera_filename>] [-l <light_filename>]
- [-g <geometry_filename>] [-o <output_filename]
+raytracer [-w <window_width>] [-h <window_height>]
+ [-c <camera_filename>] [-l <light_filename>] [-g <geometry_filename>]
 
 All values have sane defaults.
 Using the 100 sphere seen is as easy as `raytracer -g scenes/100_spheres.txt`
