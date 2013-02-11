@@ -36,6 +36,7 @@ uint16_t light_count;
 camera_t* d_camera;
 sphere_t* d_spheres;
 light_t* d_lights;
+float CoS[3];
 
 bool parse_cmd_line(int argc, char** argv);
 

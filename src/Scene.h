@@ -23,6 +23,8 @@ void create_scene(
       uint16_t win_w, uint16_t win_h
 );
 
+void get_center_of_scene(camera_t* camera, float* CoS);
+
 float get_next_float(std::ifstream& filestream);
 bool get_next_vector(std::ifstream& filestream, float* buffer);
 

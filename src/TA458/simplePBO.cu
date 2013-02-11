@@ -161,3 +161,91 @@ void initCuda()
 
   runCuda();
 }
+
+extern __host__ __device__ void cross(float* v1, float* v2, float* v_dest);
+extern __host__ __device__ void copy(float* v_src, float* v_dest);
+extern __host__ __device__ float dot(float* v1, float* v2);
+extern __host__ __device__ void zero_vector(float* v);
+extern __host__ __device__ void add(float* v1, float* v2, float* v_dest);
+extern __host__ __device__ void add_i(float* v1, float* v2);
+extern __host__ __device__ void sub(float* v1, float* v2, float* v_dest);
+extern __host__ __device__ void sub_i(float* v1, float* v2);
+extern __host__ __device__ void scale(float* v_src, float s, float* v_dest);
+extern __host__ __device__ void scale_i(float* v, float s);
+extern __host__ __device__ void norm(float* v_src, float* v_dest);
+extern __host__ __device__ void norm_i(float* v);
+extern __host__ __device__ void print(float* v);
+extern float CoS[3]; // center of scene
+const float rad_incr = M_PI / 100.0f;
+void parallel(float* v, float* axis, float* res) {
+   scale(v, dot(v, axis), res);
+}
+void perp(float* v, float* axis, float* res) {
+   parallel(v, axis, res);
+   sub(v, res, res);
+}
+void rotate(float* vec, float* point, float* axis, float radians, float* res) {
+   float sin_theta = sin(radians),
+         cos_theta = cos(radians);
+
+   float a = point[0], b = point[1], c = point[2];
+   float x = vec[0], y = vec[1], z = vec[2];
+   float u = axis[0], v = axis[1], w = axis[2];
+
+   float ux_vy_wz = u*x + v*y + w*z;
+
+   res[0] = (a * (v*v + w*w) - u * (b*v + c*w - ux_vy_wz)) * (1 - cos_theta) +
+      (x * cos_theta) + (-c*v + b*w - w*y + v*z) * sin_theta;
+   res[1] = (b * (u*u + w*w) - v * (a*u + c*w - ux_vy_wz)) * (1 - cos_theta) +
+      (y * cos_theta) + (c*u - a*w + w*x - u*z) * sin_theta;
+   res[2] = (c * (u*u + v*v) - w * (a*u + b*v - ux_vy_wz)) * (1 - cos_theta) +
+      (z * cos_theta) + (-b*u + a*v - v*x + u*y) * sin_theta;
+}
+void camera_move(float* axis, float radians) {
+   float rotated_position[3];
+   rotate(camera.position, CoS, axis, radians, rotated_position);
+
+   // front
+   float pos_min_cos[3];
+   sub(CoS, rotated_position, pos_min_cos);
+   norm(pos_min_cos, camera.front);
+
+   // up
+   float y_axis[3] = {0.0f, 1.0f, 0.0f};
+   float right[3];
+   float up[3];
+   cross(camera.front, y_axis, right);
+   cross(right, camera.front, up);
+   norm(up, camera.up);
+
+   // position
+   copy(rotated_position, camera.position);
+
+   cudaMemcpy(d_camera, &camera, sizeof(camera_t), cudaMemcpyHostToDevice);
+}
+void camera_move_up_down(float radians) {
+   float axis[3];
+   cross(camera.front, camera.up, axis);
+   norm_i(axis);
+
+   camera_move(axis, radians);
+}
+void camera_move_up() {
+   camera_move_up_down(rad_incr);
+}
+void camera_move_down() {
+   camera_move_up_down(-rad_incr);
+}
+void camera_move_left_right(float radians) {
+   float axis[3];
+   copy(camera.up, axis);
+   norm_i(axis);
+
+   camera_move(axis, radians);
+}
+void camera_move_left() {
+   camera_move_left_right(-rad_incr);
+}
+void camera_move_right() {
+   camera_move_left_right(rad_incr);
+}

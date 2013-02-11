@@ -139,6 +139,13 @@ __host__ __device__ void sub_i(float* v1, float* v2) {
    }
 }
 
+__host__ __device__ void print(float* v) {
+   for (int ndx = 0; ndx < 3; ++ndx) {
+      printf("%2.2f ", v[ndx]);
+   }
+   printf("\n");
+}
+
 /**
  * Type-specific
  */

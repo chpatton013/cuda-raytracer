@@ -21,6 +21,7 @@ int main(int argc, char** argv) {
    lights = &light_vec.front();
    sphere_count = sphere_vec.size();
    light_count = light_vec.size();
+   get_center_of_scene(&camera, CoS);
 
    initGL(argc, argv);
    initCuda();

@@ -16,6 +16,11 @@ extern GLuint textureID;
 extern unsigned int window_width;
 extern unsigned int window_height;
 
+extern void camera_move_up();
+extern void camera_move_down();
+extern void camera_move_left();
+extern void camera_move_right();
+
 // The user must create the following routines:
 void runCuda();
 
@@ -63,12 +68,23 @@ void display()
 void keyboard(unsigned char key, int x, int y)
 {
    switch(key) {
-   case(27) :
-      exit(0);
-      break;
+      case 'w': case 'W':
+         camera_move_up();
+         break;
+      case 'a': case 'A':
+         camera_move_left();
+         break;
+      case 's': case 'S':
+         camera_move_down();
+         break;
+      case 'd': case 'D':
+         camera_move_right();
+         break;
+      case 27: // ESC
+         exit(0);
+         break;
    }
 
-   // indicate the display must be redrawn
    glutPostRedisplay();
 }
 
